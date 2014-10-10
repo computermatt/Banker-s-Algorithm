@@ -24,7 +24,6 @@ public class Client extends Thread {
 		for(int i = 0; i < this.nRequests; i++) {
 			if (this.banker.remaining() == 0) {
 				this.banker.release(this.banker.remaining());
-				break;
 			} else {
 				int tmpReqUnits = rand.nextInt(this.nUnits - requestedUnits);
 				this.banker.request(tmpReqUnits);

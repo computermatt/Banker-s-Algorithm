@@ -44,7 +44,7 @@ public class Banker {
 		// --Thread /name/ has /nUnits/ units allocated.
 		// --updates banker's state and returns
 		Thread currentT = Thread.currentThread();
-		if(this.current.containsKey(currentT)) {
+		if(this.hasClaim(currentT)) {
 			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
 				System.exit(1);
 			}
@@ -56,7 +56,7 @@ public class Banker {
 	
 	public synchronized void release( int nUnits ) {
 		Thread currentT = Thread.currentThread();
-		if(this.current.containsKey(currentT)) {
+		if(this.hasClaim(currentT)) {
 			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
 				System.exit(1);
 			}

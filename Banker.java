@@ -50,16 +50,18 @@ public class Banker {
 		return false;
 	}
 	
-	public void release( int nUnits ) {
-		//TODO
-		// System.exit(1) if:
-		// -current thread has no claim registered, or
-		// -nUnits is not strictly positive, or
-		// -nUnits exceeds number of units allocated to the current thread.
-		// print message: Thread /name/ releases nUnits units.
-		// release nUnits of the units allocated to the current thread
-		// notify all waiting threads
-		// return
+	public synchronized void release( int nUnits ) {
+		Thread currentT = Thread.currentThread();
+		if(this.current.containsKey(currentT)) {
+			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
+				System.exit(1);
+			}
+			System.out.println(RELEASE, currentT.getName(), nUnits);
+			this.current.key(currentT) = this.current.key(currentT) - nUnits;
+			Thread.notifyAll();
+		} else {
+			System.exit(1);
+		}
 	}
 	
 	public int allocated() {

@@ -18,23 +18,23 @@ public class Client extends Thread {
 
 	public void run() {
 	    Random rand = new Random();
-		int requestedUnits = 0;
 		this.banker.setClaim(this.nUnits);
 
 		for(int i = 0; i < this.nRequests; i++) {
 			if (this.banker.remaining() == 0) {
-				this.banker.release(this.banker.remaining());
+				if(this.banker.allocated() > 0)
+					this.banker.release(this.banker.allocated());
 			} else {
-				int tmpReqUnits = rand.nextInt(this.nUnits - requestedUnits);
+				int tmpReqUnits = rand.nextInt(this.nUnits - this.banker.allocated()) + 1;
 				this.banker.request(tmpReqUnits);
-				requestedUnits += tmpReqUnits;
 			}
-			long millis = (rand.nextLong() % (this.maxSleepMillis - this.minSleepMillis)) + this.minSleepMillis;
+			long millis = (Math.abs(rand.nextLong()) % (this.maxSleepMillis - this.minSleepMillis)) + this.minSleepMillis;
 			try {
 				Thread.sleep(millis); 
 			} catch(InterruptedException e){}
 		}
-		this.banker.release(requestedUnits);
+		if(this.banker.allocated() > 0)
+			this.banker.release(this.banker.allocated());
 	}
 
 

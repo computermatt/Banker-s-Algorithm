@@ -3,7 +3,7 @@ import java.util.ArrayList;
 public class Driver 
 {
 	//Total number of resources the banker can allocate
-	private final static int bankerResource = 4;
+	private final static int bankerResource = 8;
 	
 	//Number of client served by banker
 	private final static int numClient = 2;

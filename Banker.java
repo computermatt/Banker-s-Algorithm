@@ -1,9 +1,13 @@
-import java.util.Map;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Banker {
 
+	// print statements
 	private static final String CLAIM = "Thread %s sets a claim for %d units.";
 	private static final String REQUEST = "Thread %s requests %d units.";
 	private static final String ALLOCATE = "Thread %s has %d units allocated.";
@@ -11,38 +15,34 @@ public class Banker {
 	private static final String WAKE = "Thread %s awakened.";
 	private static final String RELEASE = "Thread %s releases %d units.";
 
+	// currently available resources
 	private int nResources;
-
-	private Map<Thread, Integer> allocated = Collections.synchronizedMap( new HashMap<Thread, Integer>());
-	private Map<Thread, Integer> remaining = Collections.synchronizedMap( new HashMap<Thread, Integer>());
+	
+	// map of clients to allocated-remaining pairs
+	private Map<Thread, Pair> claims = Collections.synchronizedMap( new HashMap<Thread, Pair>());
 	
 	public Banker( int nUnits ) {
 		nResources = nUnits;
 	}
 	
+	// set a claim for nUnits units, making the calling client's 'remaining' = nUnits
 	public synchronized void setClaim( int nUnits ) {
 		Thread currentThread = Thread.currentThread();
 		if( nUnits <= 0 || nUnits > nResources || hasClaim( currentThread ) )
 			System.exit(1);
-		allocated.put( currentThread, 0 );
-		remaining.put( currentThread, nUnits );
+		claims.put( currentThread, new Pair( 0, nUnits ) );
 		System.out.println( String.format( CLAIM, currentThread.getName(), nUnits ) );
 	}
 	
 	public synchronized boolean request( int nUnits ) {
 		Thread currentT = Thread.currentThread();
-		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.remaining.get(currentT))
+		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.claims.get(currentT).remaining)
 			System.exit(1);
 		
 		System.out.println( String.format( REQUEST, currentT.getName(), nUnits ));
 
-		// check potential state
-		int[] allocatedArray = new int[allocated.size()];
-		int[] remainingArray = new int[remaining.size()];
-		fillArraysForPotentialState( allocatedArray, remainingArray, currentT, nUnits );
-		
-		while( !safe( nResources - nUnits, allocatedArray, remainingArray ) ) {
-			// wait
+		// wait until safe state
+		while( !safe( nResources - nUnits, buildPotentialStateList( currentT, nUnits ) ) ) {
 			System.out.println( String.format( WAIT, currentT.getName() ) );
 			try {
 				wait();
@@ -50,55 +50,73 @@ public class Banker {
 				e.printStackTrace();
 			}
 			System.out.println( String.format( WAKE, currentT.getName() ) );
-			
-			// check again with new state
-			fillArraysForPotentialState( allocatedArray, remainingArray, currentT, nUnits );
 		}
 		
 		// allocate resources
 		System.out.println( String.format( ALLOCATE, currentT.getName(), nUnits ) );
-		allocated.put( currentT, allocated.get( currentT ) + nUnits );
-		remaining.put( currentT, remaining.get( currentT ) - nUnits );
+		claims.get( currentT ).allocated += nUnits;
+		claims.get( currentT ).remaining -= nUnits;
 		nResources -= nUnits;
 		return true;
 	}
 	
 	public synchronized void release( int nUnits ) {
 		Thread currentT = Thread.currentThread();
-		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.allocated.get(currentT))
+		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.claims.get(currentT).allocated)
 			System.exit(1);
 		System.out.println(String.format(RELEASE, currentT.getName(), nUnits));
-		this.allocated.put(currentT, this.allocated.get(currentT) - nUnits);
+		this.claims.get(currentT).allocated -= nUnits;
 		nResources += nUnits;
 		notifyAll();
 	}
 	
 	public synchronized int allocated() {
-		return allocated.get( Thread.currentThread() );
+		return claims.get( Thread.currentThread() ).allocated;
 	}
 	
 	public synchronized int remaining() {
-		return remaining.get( Thread.currentThread() );
+		return claims.get( Thread.currentThread() ).remaining;
 	}
 	
 	private boolean hasClaim( Thread t ) {
-		return allocated.containsKey( t ) && remaining.containsKey( t ) && allocated.get( t ) + remaining.get( t ) > 0;
+		return claims.containsKey( t ) && claims.get( t ).allocated + claims.get( t ).remaining > 0;
 	}
 	
-	private void fillArraysForPotentialState( int[] allocated, int[] remaining, Thread currentThread, int nUnits ) {
-		int i = 0;
-		for( Thread t : this.allocated.keySet() ) {
-			if( t.equals( currentThread ) ) {
-				allocated[i] = this.allocated.get( t ) + nUnits;
-				remaining[i++] = this.remaining.get( t ) - nUnits;
-			} else {
-				allocated[i] = this.allocated.get( t );
-				remaining[i++] = this.remaining.get( t );
-			}
+	private List<Pair> buildPotentialStateList( Thread currentThread, int nUnits ) {
+		List<Pair> list = new ArrayList<Pair>(claims.size());
+		
+		// fill the list with values copied from map, with resources allocated to the currentThread
+		for( Map.Entry<Thread, Pair> entry : claims.entrySet() ) {
+			if( entry.getKey().equals( currentThread ) )
+				list.add( new Pair( entry.getValue().allocated + nUnits, entry.getValue().remaining - nUnits ) );
+			else
+				list.add( new Pair( entry.getValue().allocated, entry.getValue().remaining ) );
 		}
+		
+		// sort the list by ascending remaining
+		Collections.sort( list, new Comparator<Pair>() {
+				public int compare( Pair p1, Pair p2 ) {
+					return p1.remaining - p2.remaining;
+				}
+			} );
+		
+		return list;
 	}
 	
-	private boolean safe( int resources, int[] allocated, int[] remaining ) {
-		return false;
+	private boolean safe( int resources, List<Pair> state ) {
+		for( Pair p : state ) {
+			if( p.remaining > resources ) return false;
+			resources += p.allocated;
+		}
+		return true;
+	}
+	
+	private static class Pair {
+		public int allocated;
+		public int remaining;
+		public Pair(int a, int r) {
+			allocated = a;
+			remaining = r;
+		}
 	}
 }

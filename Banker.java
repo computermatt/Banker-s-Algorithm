@@ -32,10 +32,6 @@ public class Banker {
 	
 	public boolean request( int nUnits ) {
 		//TODO
-		// System.exit(1) if:
-		// -current thread has no claim registered, or
-		// -nUnits is not strictly positive, or
-		// -nUnits exceeds invoking thread's remaining claim
 		// print message: Thread /name/ requests /nUnits/ units.
 		// If allocating the resources results in a safe state,
 		// -print message: Thread /name/ has /nUnits/ units allocated.
@@ -47,6 +43,14 @@ public class Banker {
 		// -if allocating resource results in safe state, prints message:
 		// --Thread /name/ has /nUnits/ units allocated.
 		// --updates banker's state and returns
+		Thread currentT = Thread.currentThread();
+		if(this.current.containsKey(currentT)) {
+			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
+				System.exit(1);
+			}
+		} else {
+			System.exit(1);
+		}
 		return false;
 	}
 	
@@ -56,9 +60,9 @@ public class Banker {
 			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
 				System.exit(1);
 			}
-			System.out.println(RELEASE, currentT.getName(), nUnits);
-			this.current.key(currentT) = this.current.key(currentT) - nUnits;
-			Thread.notifyAll();
+			System.out.println(String.format(RELEASE, currentT.getName(), nUnits));
+			this.current.put(currentT, this.current.get(currentT) - nUnits);
+			notifyAll();
 		} else {
 			System.exit(1);
 		}

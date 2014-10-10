@@ -20,8 +20,7 @@ public class Banker {
 		nResources = nUnits;
 	}
 	
-	//TODO synchronize?
-	public void setClaim( int nUnits ) {
+	public synchronized void setClaim( int nUnits ) {
 		Thread currentThread = Thread.currentThread();
 		if( nUnits <= 0 || nUnits > nResources || hasClaim( currentThread ) )
 			System.exit(1);
@@ -30,7 +29,7 @@ public class Banker {
 		System.out.println( String.format( CLAIM, currentThread.getName(), nUnits ) );
 	}
 	
-	public boolean request( int nUnits ) {
+	public synchronized boolean request( int nUnits ) {
 		//TODO
 		// print message: Thread /name/ requests /nUnits/ units.
 		// If allocating the resources results in a safe state,
@@ -44,41 +43,29 @@ public class Banker {
 		// --Thread /name/ has /nUnits/ units allocated.
 		// --updates banker's state and returns
 		Thread currentT = Thread.currentThread();
-		if(this.hasClaim(currentT)) {
-			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
-				System.exit(1);
-			}
-		} else {
+		if(nUnits <= 0 || !this.hasClaim(currentT) || this.current.get(currentT))
 			System.exit(1);
-		}
 		return false;
 	}
 	
 	public synchronized void release( int nUnits ) {
 		Thread currentT = Thread.currentThread();
-		if(this.hasClaim(currentT)) {
-			if(nUnits < 0 || nUnits > this.current.get(currentT)) {
-				System.exit(1);
-			}
-			System.out.println(String.format(RELEASE, currentT.getName(), nUnits));
-			this.current.put(currentT, this.current.get(currentT) - nUnits);
-			notifyAll();
-		} else {
+		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.current.get(currentT))
 			System.exit(1);
-		}
+		System.out.println(String.format(RELEASE, currentT.getName(), nUnits));
+		this.current.put(currentT, this.current.get(currentT) - nUnits);
+		notifyAll();
 	}
 	
-	public int allocated() {
-		//TODO return # units allocated to current thread
-		return 0;
+	public synchronized int allocated() {
+		return current.get( Thread.currentThread() );
 	}
 	
-	public int remaining() {
-		//TODO return # units remaining in current thread's claim
-		return 0;
+	public synchronized int remaining() {
+		return remaining.get( Thread.currentThread() );
 	}
 	
 	private boolean hasClaim( Thread t ) {
-		return current.containsKey(t);
+		return current.containsKey( t ) && remaining.containsKey( t ) && current.get( t ) + remaining.get( t ) > 0;
 	}
 }

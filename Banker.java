@@ -1,23 +1,33 @@
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
+
 public class Banker {
 
-	private int nUnits;
+	private static final String CLAIM = "Thread %s sets a claim for %d units.";
+	private static final String REQUEST = "Thread %s requests %d units.";
+	private static final String ALLOCATE = "Thread %s has %d units allocated.";
+	private static final String WAIT = "Thread %s waits.";
+	private static final String WAKE = "Thread %s awakened.";
+	private static final String RELEASE = "Thread %s releases %d units.";
 
+	private int nResources;
+
+	private Map<Thread, Integer> current = Collections.synchronizedMap( new HashMap<Thread, Integer>());
+	private Map<Thread, Integer> remaining = Collections.synchronizedMap( new HashMap<Thread, Integer>());
+	
 	public Banker( int nUnits ) {
-		this.nUnits = nUnits;
+		nResources = nUnits;
 	}
 	
+	//TODO synchronize?
 	public void setClaim( int nUnits ) {
-		//TODO
-		// current thread is accessible via Thread.currentThread()
-		// System.exit(1) if:
-		// -thread already has a claim registered, or
-		// -nUnits is not strictly positive, or
-		// -nUnits exceeds number resources in the system
-		// Associate thread with current claim = nUnits and current allocation = 0
-		// print message: Thread /name/ sets a claim for /nUnits/ units.
-		// -/name/ = Thread.currentThread().getName()
-		// -nUnits is number resources claimed
-		// return
+		Thread currentThread = Thread.currentThread();
+		if( nUnits <= 0 || nUnits > nResources || hasClaim( currentThread ) )
+			System.exit(1);
+		current.put( currentThread, 0 );
+		remaining.put( currentThread, nUnits );
+		System.out.println( String.format( CLAIM, currentThread.getName(), nUnits ) );
 	}
 	
 	public boolean request( int nUnits ) {
@@ -40,7 +50,7 @@ public class Banker {
 		return false;
 	}
 	
-	public void release( int nUnits) {
+	public void release( int nUnits ) {
 		//TODO
 		// System.exit(1) if:
 		// -current thread has no claim registered, or
@@ -60,5 +70,9 @@ public class Banker {
 	public int remaining() {
 		//TODO return # units remaining in current thread's claim
 		return 0;
+	}
+	
+	private boolean hasClaim( Thread t ) {
+		return current.containsKey(t);
 	}
 }

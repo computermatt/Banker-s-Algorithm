@@ -21,6 +21,7 @@ public class Banker {
 	// map of clients to allocated-remaining pairs
 	private Map<Thread, Pair> claims = Collections.synchronizedMap( new HashMap<Thread, Pair>());
 	
+	// make a banker with nUnits total resources
 	public Banker( int nUnits ) {
 		nResources = nUnits;
 	}
@@ -30,10 +31,13 @@ public class Banker {
 		Thread currentThread = Thread.currentThread();
 		if( nUnits <= 0 || nUnits > nResources || hasClaim( currentThread ) )
 			System.exit(1);
+			
 		claims.put( currentThread, new Pair( 0, nUnits ) );
 		System.out.println( String.format( CLAIM, currentThread.getName(), nUnits ) );
 	}
 	
+	// request nUnits resources for the current thread
+	// if the request would result in an unsafe state, the thread waits until the banker has more resources
 	public synchronized boolean request( int nUnits ) {
 		Thread currentT = Thread.currentThread();
 		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.claims.get(currentT).remaining)
@@ -60,28 +64,38 @@ public class Banker {
 		return true;
 	}
 	
+	// release nUnits resources
 	public synchronized void release( int nUnits ) {
 		Thread currentT = Thread.currentThread();
 		if(nUnits <= 0 || !this.hasClaim(currentT) || nUnits > this.claims.get(currentT).allocated)
 			System.exit(1);
+			
 		System.out.println(String.format(RELEASE, currentT.getName(), nUnits));
 		this.claims.get(currentT).allocated -= nUnits;
 		nResources += nUnits;
+		
+		// notify all waiting threads that the banker has more resources so their requests might be able to complete
 		notifyAll();
 	}
-	
+
+	// get number of resources allocated to current thread
 	public synchronized int allocated() {
 		return claims.get( Thread.currentThread() ).allocated;
 	}
 	
+	// get number of resources remaining in current thread's claim
 	public synchronized int remaining() {
 		return claims.get( Thread.currentThread() ).remaining;
 	}
 	
+	// whether or not the given thread has a claim
 	private boolean hasClaim( Thread t ) {
 		return claims.containsKey( t ) && claims.get( t ).allocated + claims.get( t ).remaining > 0;
 	}
 	
+	// builds a list representing a potential state, for use in the banker's algorithm
+	// the resulting list reflects nUnits being allocated to currentThread, and is sorted by increasing remaining resources
+	// this must not modify banker's state (map is deep-copied into list)
 	private List<Pair> buildPotentialStateList( Thread currentThread, int nUnits ) {
 		List<Pair> list = new ArrayList<Pair>(claims.size());
 		
@@ -103,6 +117,7 @@ public class Banker {
 		return list;
 	}
 	
+	// the banker's algorithm - returns true iff given state is "safe"
 	private boolean safe( int resources, List<Pair> state ) {
 		for( Pair p : state ) {
 			if( p.remaining > resources ) return false;
@@ -111,6 +126,7 @@ public class Banker {
 		return true;
 	}
 	
+	// data structure containing both allocated and remaining resources
 	private static class Pair {
 		public int allocated;
 		public int remaining;
